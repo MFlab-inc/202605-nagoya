@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Uniswap v3 流動性最適化ツール | ETH/USDC on Base</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg2: #161b22;
+      --bg3: #1c2128;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text2: #8b949e;
+      --blue: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --orange: #d29922;
+      --purple: #bc8cff;
+      --pink: #f778ba;
+      --accent: #1f6feb;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #ff007a, #7b3fe4);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .header h1 { font-size: 16px; font-weight: 600; }
+    .header-sub { color: var(--text2); font-size: 13px; margin-left: auto; }
+    .chain-badge {
+      background: #0052ff22;
+      border: 1px solid #0052ff55;
+      color: #4d8fff;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 14px;
+      border-radius: 2px;
+      background: var(--blue);
+    }
+
+    .input-group { margin-bottom: 14px; }
+    .input-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 6px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .input-row:focus-within { border-color: var(--blue); }
+
+    .input-row input {
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      padding: 10px 12px;
+      flex: 1;
+      width: 100%;
+    }
+
+    .input-unit {
+      padding: 10px 12px;
+      color: var(--text2);
+      font-size: 12px;
+      background: var(--bg2);
+      border-left: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .range-container {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .range-sep { color: var(--text2); font-size: 13px; }
+
+    .stat-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
+    .stat-value { font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .stat-sub { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+    .positive { color: var(--green); }
+    .negative { color: var(--red); }
+    .warning { color: var(--orange); }
+    .neutral { color: var(--blue); }
+    .purple { color: var(--purple); }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.2s;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn:hover { background: #388bfd; }
+
+    .btn-secondary {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover { background: var(--border); }
+
+    .progress-bar {
+      height: 8px;
+      background: var(--bg3);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 200px;
+      margin-top: 12px;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .strategy-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .strategy-card:hover { border-color: var(--blue); background: rgba(88, 166, 255, 0.05); }
+    .strategy-card.active { border-color: var(--blue); background: rgba(88, 166, 255, 0.1); }
+
+    .strategy-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .strategy-name { font-weight: 600; font-size: 14px; }
+    .strategy-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    .badge-conservative { background: #1f6feb33; color: var(--blue); border: 1px solid #1f6feb55; }
+    .badge-balanced { background: #3fb95033; color: var(--green); border: 1px solid #3fb95055; }
+    .badge-aggressive { background: #d2992233; color: var(--orange); border: 1px solid #d2992255; }
+
+    .strategy-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+    .strategy-metrics { display: flex; gap: 16px; margin-top: 10px; }
+    .strategy-metric { font-size: 12px; }
+    .strategy-metric span { font-weight: 600; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { color: var(--text2); font-weight: 500; text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--bg3); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg3); }
+
+    .tooltip {
+      position: relative;
+      display: inline-block;
+      cursor: help;
+    }
+    .tooltip:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      z-index: 10;
+    }
+
+    .alert {
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.5;
+    }
+    .alert-warning { background: #d2992215; border: 1px solid #d2992255; color: #e3b341; }
+    .alert-info { background: #1f6feb15; border: 1px solid #1f6feb55; color: #79c0ff; }
+    .alert-success { background: #3fb95015; border: 1px solid #3fb95055; color: #56d364; }
+    .alert-danger { background: #f8514915; border: 1px solid #f8514955; color: #ff7b72; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 24px 0 14px;
+    }
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 20px 0;
+    }
+
+    .il-curve { position: relative; }
+    .price-indicator {
+      position: absolute;
+      top: 0;
+      width: 2px;
+      height: 100%;
+      background: var(--orange);
+      opacity: 0.7;
+    }
+
+    .tag {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text2);
+    }
+
+    .recommendation-item {
+      display: flex;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--bg3);
+    }
+    .recommendation-item:last-child { border-bottom: none; }
+    .rec-icon { font-size: 18px; flex-shrink: 0; }
+    .rec-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .rec-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+    @media (max-width: 768px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .main { padding: 12px; }
+    }
+
+    .pnl-breakdown {
+      background: var(--bg3);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .pnl-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+    .pnl-row.total {
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      padding-top: 12px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .pnl-label { color: var(--text2); }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      padding: 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--blue);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .slider-row { display: flex; align-items: center; gap: 12px; }
+    .slider-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; min-width: 48px; text-align: right; color: var(--blue); }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">U</div>
+  <h1>Uniswap v3 流動性最適化ツール</h1>
+  <div class="chain-badge">Base Chain</div>
+  <div class="header-sub">ETH / USDC • 0.05% プール</div>
+</div>
+
+<div class="main">
+
+  <!-- Alert -->
+  <div class="alert alert-info">
+    💡 このツールはIL（無常損失）・手数料収入・ガスコストを統合的に分析し、最適な流動性戦略を提案します。数値を入力して「計算実行」を押してください。
+  </div>
+
+  <!-- Input Section -->
+  <div class="section-header">
+    <div class="section-title">📊 ポジション設定</div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">現在の市場状況</div>
+
+      <div class="input-group">
+        <label>現在のETH価格</label>
+        <div class="input-row">
+          <input type="number" id="currentPrice" value="3800" step="10">
+          <span class="input-unit">USDC</span>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>投入資本</label>
+        <div class="input-row">
+          <input type="number" id="capital" value="10000" step="100">
+          <span class="input-unit">USDC</span>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>運用期間</label>
+        <div class="input-row">
+          <input type="number" id="days" value="30" step="1">
+          <span class="input-unit">日</span>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>プール日次取引量</label>
+        <div class="input-row">
+          <input type="number" id="dailyVolume" value="15000000" step="1000000">
+          <span class="input-unit">USDC</span>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>プールTVL（総預入流動性）</label>
+        <div class="input-row">
+          <input type="number" id="poolTVL" value="50000000" step="1000000">
+          <span class="input-unit">USDC</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">レンジ設定</div>
+
+      <div class="input-group">
+        <label>価格レンジ下限</label>
+        <div class="input-row">
+          <input type="number" id="rangeLow" value="3200" step="10">
+          <span class="input-unit">USDC</span>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>価格レンジ上限</label>
+        <div class="input-row">
+          <input type="number" id="rangeHigh" value="4500" step="10">
+          <span class="input-unit">USDC</span>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>ETHの価格変動シミュレーション</label>
+        <div class="slider-row">
+          <input type="range" id="priceSlider" min="-60" max="60" value="0" step="1">
+          <span class="slider-val" id="priceSliderVal">+0%</span>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>想定年次ボラティリティ（ETH）</label>
+        <div class="input-row">
+          <input type="number" id="volatility" value="80" step="1">
+          <span class="input-unit">%</span>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>リバランス回数（期間内）</label>
+        <div class="input-row">
+          <input type="number" id="rebalanceCount" value="1" step="1" min="0" max="10">
+          <span class="input-unit">回</span>
+        </div>
+      </div>
+
+      <button class="btn" onclick="calculate()">▶ 計算実行</button>
+    </div>
+  </div>
+
+  <!-- Key Metrics -->
+  <div class="section-header">
+    <div class="section-title">📈 主要指標</div>
+  </div>
+
+  <div class="grid-4">
+    <div class="stat-card">
+      <div class="stat-label">推定手数料収入</div>
+      <div class="stat-value positive" id="feeIncome">-</div>
+      <div class="stat-sub" id="feeAPR">APR: -%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">無常損失 (IL)</div>
+      <div class="stat-value negative" id="ilAmount">-</div>
+      <div class="stat-sub" id="ilPercent">変動後: -%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">ガスコスト（Base）</div>
+      <div class="stat-value warning" id="gasCost">-</div>
+      <div class="stat-sub" id="gasBreakdown">入金+リバランス</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">純利益（推定）</div>
+      <div class="stat-value" id="netPnl">-</div>
+      <div class="stat-sub" id="netPnlPct">手数料 - IL - ガス</div>
+    </div>
+  </div>
+
+  <!-- PnL Breakdown & IL Curve -->
+  <div class="grid-2" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-title">損益内訳</div>
+      <div class="pnl-breakdown" id="pnlBreakdown">
+        <div class="pnl-row">
+          <span class="pnl-label">手数料収入</span>
+          <span class="mono positive" id="pnlFee">-</span>
+        </div>
+        <div class="pnl-row">
+          <span class="pnl-label">無常損失</span>
+          <span class="mono negative" id="pnlIL">-</span>
+        </div>
+        <div class="pnl-row">
+          <span class="pnl-label">ガスコスト</span>
+          <span class="mono warning" id="pnlGas">-</span>
+        </div>
+        <div class="pnl-row">
+          <span class="pnl-label">HODLとの比較 (vs HODL)</span>
+          <span class="mono neutral" id="pnlVsHodl">-</span>
+        </div>
+        <div class="pnl-row total">
+          <span>総合PnL</span>
+          <span class="mono" id="pnlTotal">-</span>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="card-title" style="margin-bottom:10px;">損益分岐点</div>
+      <div id="breakevenInfo" style="font-size:13px; color:var(--text2); line-height:1.8;">
+        計算を実行してください
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">ILカーブ（価格変動 vs IL%）</div>
+      <div class="chart-container">
+        <canvas id="ilChart"></canvas>
+      </div>
+      <div style="font-size:11px; color:var(--text2); margin-top:8px; text-align:center;">
+        橙線: 現在価格 | 青エリア: レンジ内 | 赤エリア: レンジ外（フルIL）
+      </div>
+    </div>
+  </div>
+
+  <!-- Strategy Suggestions -->
+  <div class="section-header">
+    <div class="section-title">🎯 戦略オプション</div>
+  </div>
+
+  <div class="grid-3">
+    <div class="strategy-card active" id="strat-conservative" onclick="selectStrategy('conservative')">
+      <div class="strategy-header">
+        <span class="strategy-name">コンサバティブ（広レンジ）</span>
+        <span class="strategy-badge badge-conservative">低リスク</span>
+      </div>
+      <div class="strategy-desc">価格変動の±40〜50%をカバーする広いレンジ。ILは小さいがキャピタル効率は低め。長期保有・ノーメンテ向き。</div>
+      <div class="strategy-metrics">
+        <div class="strategy-metric">IL: <span class="neutral">小</span></div>
+        <div class="strategy-metric">APR: <span class="warning">中</span></div>
+        <div class="strategy-metric">ガス: <span class="positive">少</span></div>
+      </div>
+    </div>
+
+    <div class="strategy-card" id="strat-balanced" onclick="selectStrategy('balanced')">
+      <div class="strategy-header">
+        <span class="strategy-name">バランス（中レンジ）</span>
+        <span class="strategy-badge badge-balanced">バランス</span>
+      </div>
+      <div class="strategy-desc">±20〜25%のレンジ。ボラティリティ1σ相当。手数料効率とILリスクのトレードオフが最適化されたゾーン。</div>
+      <div class="strategy-metrics">
+        <div class="strategy-metric">IL: <span class="warning">中</span></div>
+        <div class="strategy-metric">APR: <span class="positive">高</span></div>
+        <div class="strategy-metric">ガス: <span class="warning">中</span></div>
+      </div>
+    </div>
+
+    <div class="strategy-card" id="strat-aggressive" onclick="selectStrategy('aggressive')">
+      <div class="strategy-header">
+        <span class="strategy-name">アグレッシブ（狭レンジ）</span>
+        <span class="strategy-badge badge-aggressive">高リスク</span>
+      </div>
+      <div class="strategy-desc">±5〜10%の非常に狭いレンジ。レンジ内なら高APR。頻繁なリバランスが必要でガスコストと要相談。</div>
+      <div class="strategy-metrics">
+        <div class="strategy-metric">IL: <span class="negative">大</span></div>
+        <div class="strategy-metric">APR: <span class="positive">最高</span></div>
+        <div class="strategy-metric">ガス: <span class="negative">多</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Optimized Range Suggestion -->
+  <div class="card" style="margin-top:16px;">
+    <div class="card-title">最適レンジ自動提案（ボラティリティベース）</div>
+    <div id="optimalRange" class="grid-3">
+      <div class="stat-card">
+        <div class="stat-label">推奨 下限価格</div>
+        <div class="stat-value neutral" id="optLow">-</div>
+        <div class="stat-sub">1σ下方</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">推奨 上限価格</div>
+        <div class="stat-value neutral" id="optHigh">-</div>
+        <div class="stat-sub">1σ上方</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">推定レンジ内確率</div>
+        <div class="stat-value purple" id="inRangeProb">-</div>
+        <div class="stat-sub">期間中の在圏率</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rebalancing Analysis -->
+  <div class="section-header">
+    <div class="section-title">⚡ リバランス戦略分析</div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">リバランスコスト分析（Base Chain）</div>
+      <table>
+        <thead>
+          <tr>
+            <th>アクション</th>
+            <th>推定Gasコスト</th>
+            <th>USDC換算</th>
+          </tr>
+        </thead>
+        <tbody id="gasTable">
+          <tr>
+            <td>流動性追加（Mint）</td>
+            <td class="mono">~200,000 gas</td>
+            <td class="mono warning">$0.80</td>
+          </tr>
+          <tr>
+            <td>流動性撤退（Burn）</td>
+            <td class="mono">~180,000 gas</td>
+            <td class="mono warning">$0.72</td>
+          </tr>
+          <tr>
+            <td>手数料回収（Collect）</td>
+            <td class="mono">~80,000 gas</td>
+            <td class="mono warning">$0.32</td>
+          </tr>
+          <tr>
+            <td>スワップ（再配分）</td>
+            <td class="mono">~120,000 gas</td>
+            <td class="mono warning">$0.48</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;">リバランス1回合計</td>
+            <td class="mono" colspan="1">-</td>
+            <td class="mono negative" style="font-weight:600;">~$2.32</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="alert alert-success" style="margin-top:14px; margin-bottom:0;">
+        ✅ <strong>Baseは超低コスト：</strong> Ethereumメインネット比で約50〜100分の1。積極的リバランスも選択肢に入る。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">リバランストリガー条件</div>
+
+      <div class="recommendation-item">
+        <span class="rec-icon">📏</span>
+        <div>
+          <div class="rec-title">価格がレンジ端の15%以内に入ったとき</div>
+          <div class="rec-desc">レンジアウト直前の早期対処。手数料収入を維持しながら新レンジを再設定。</div>
+        </div>
+      </div>
+      <div class="recommendation-item">
+        <span class="rec-icon">💰</span>
+        <div>
+          <div class="rec-title">累積手数料がガスコストの3倍を超えたとき</div>
+          <div class="rec-desc">Collect単体でも採算が合う条件。Base Chain では手数料 ~$1以上が目安。</div>
+        </div>
+      </div>
+      <div class="recommendation-item">
+        <span class="rec-icon">📉</span>
+        <div>
+          <div class="rec-title">ILが手数料収入の50%を超えそうなとき</div>
+          <div class="rec-desc">損切りより早め、レンジ再設定でIL確定を回避しつつリポジション。</div>
+        </div>
+      </div>
+      <div class="recommendation-item">
+        <span class="rec-icon">⏰</span>
+        <div>
+          <div class="rec-title">週次での定期リバランス（ドルコスト平均型）</div>
+          <div class="rec-desc">感情除外の機械的リバランス。Baseなら週次でも$10未満のコスト。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advanced Ideas -->
+  <div class="section-header">
+    <div class="section-title">🚀 高度な最適化アイデア</div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">IL軽減戦略</div>
+
+      <div class="recommendation-item">
+        <span class="rec-icon">🔄</span>
+        <div>
+          <div class="rec-title">デルタヘッジ（オプション/パーペチュアル活用）</div>
+          <div class="rec-desc">Synthetix・Lyra・Deribit等でETHのショートポジションを保有してILをオフセット。ヘッジコストとIL削減効果を毎週比較。</div>
+        </div>
+      </div>
+
+      <div class="recommendation-item">
+        <span class="rec-icon">📊</span>
+        <div>
+          <div class="rec-title">非対称レンジ（トレンドバイアス）</div>
+          <div class="rec-desc">強気相場なら上方に広め（例 現在+30% / 現在-15%）にレンジを設定。方向性予測を組み込んだ非対称配置。</div>
+        </div>
+      </div>
+
+      <div class="recommendation-item">
+        <span class="rec-icon">🏦</span>
+        <div>
+          <div class="rec-title">複数レンジ分散（Ladder戦略）</div>
+          <div class="rec-desc">資本を3〜5のレンジに分散配置。一つがレンジ外に出ても他がカバー。IL合計を分散効果で軽減。</div>
+        </div>
+      </div>
+
+      <div class="recommendation-item">
+        <span class="rec-icon">🤖</span>
+        <div>
+          <div class="rec-title">Arrakis Finance / Gamma等の自動管理</div>
+          <div class="rec-desc">アルゴリズムで自動リバランスするプロトコル。手数料0.5〜1%/年だが完全ハンズオフ運用。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">収益最大化戦略</div>
+
+      <div class="recommendation-item">
+        <span class="rec-icon">🌾</span>
+        <div>
+          <div class="rec-title">LP トークンの追加収益化（YieldLayer）</div>
+          <div class="rec-desc">Aerodrome/Velodrome（Base）でLPポジションをステーク。スワップ手数料 + veToken投票インセンティブで2重収益。</div>
+        </div>
+      </div>
+
+      <div class="recommendation-item">
+        <span class="rec-icon">📐</span>
+        <div>
+          <div class="rec-title">ティックスペーシングの最適化</div>
+          <div class="rec-desc">0.05%プール（最小ティック間隔10）vs 0.3%プール（60）。ETH/USDCは0.05%が取引量集中。流動性密度 × 手数料率を毎月評価。</div>
+        </div>
+      </div>
+
+      <div class="recommendation-item">
+        <span class="rec-icon">⏱️</span>
+        <div>
+          <div class="rec-title">手数料回収タイミング最適化</div>
+          <div class="rec-desc">手数料は複利化されない（自動再投資なし）。週次または一定額（$50以上）貯まったらCollectし、再投資して複利効果を得る。</div>
+        </div>
+      </div>
+
+      <div class="recommendation-item">
+        <span class="rec-icon">🎯</span>
+        <div>
+          <div class="rec-title">市場急変動後のレンジ再設定</div>
+          <div class="rec-desc">大きな価格変動直後はボラが高くスプレッドが広い。レンジアウト後すぐより、1〜2日待って新価格帯が落ち着いてから再設定。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comparison Table -->
+  <div class="section-header">
+    <div class="section-title">📋 戦略比較表（30日・$10,000投入）</div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>戦略</th>
+          <th>レンジ幅</th>
+          <th>推定APR</th>
+          <th>最大IL</th>
+          <th>リバランス頻度</th>
+          <th>30日ガスコスト</th>
+          <th>推定純益（±20%相場）</th>
+          <th>推奨ケース</th>
+        </tr>
+      </thead>
+      <tbody id="comparisonTable">
+        <tr>
+          <td><strong>HODL（比較）</strong></td>
+          <td class="mono">-</td>
+          <td class="mono neutral">0%</td>
+          <td class="mono">-</td>
+          <td class="mono">なし</td>
+          <td class="mono positive">$0</td>
+          <td class="mono neutral">±市場変動のみ</td>
+          <td>相場観強い場合</td>
+        </tr>
+        <tr>
+          <td><strong>広レンジ（±50%）</strong></td>
+          <td class="mono">$1,900 - $5,700</td>
+          <td class="mono positive">15〜25%</td>
+          <td class="mono warning">5.7%</td>
+          <td class="mono">月0〜1回</td>
+          <td class="mono positive">$2〜5</td>
+          <td class="mono positive">+$80〜180</td>
+          <td>長期・放置</td>
+        </tr>
+        <tr>
+          <td><strong>中レンジ（±20%）</strong></td>
+          <td class="mono">$3,040 - $4,560</td>
+          <td class="mono positive">35〜60%</td>
+          <td class="mono warning">2.0%</td>
+          <td class="mono">月1〜2回</td>
+          <td class="mono warning">$5〜15</td>
+          <td class="mono positive">+$200〜380</td>
+          <td>バランス型 ★推奨</td>
+        </tr>
+        <tr>
+          <td><strong>狭レンジ（±8%）</strong></td>
+          <td class="mono">$3,496 - $4,104</td>
+          <td class="mono positive">150〜300%</td>
+          <td class="mono negative">0.3%</td>
+          <td class="mono">週1〜2回</td>
+          <td class="mono negative">$20〜50</td>
+          <td class="mono warning">+$50〜300 (高分散)</td>
+          <td>アクティブ管理</td>
+        </tr>
+        <tr>
+          <td><strong>Ladder（3レンジ）</strong></td>
+          <td class="mono">各±15%分散</td>
+          <td class="mono positive">40〜70%</td>
+          <td class="mono positive">分散効果</td>
+          <td class="mono">月1〜2回</td>
+          <td class="mono warning">$10〜25</td>
+          <td class="mono positive">+$250〜450</td>
+          <td>最安定・推奨</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Final Recommendations -->
+  <div class="section-header">
+    <div class="section-title">💡 総合提言</div>
+  </div>
+
+  <div class="alert alert-success">
+    <div>
+      <strong>Base Chain ETH/USDC の最適戦略：</strong><br>
+      ① <strong>ボラティリティ1σ（±20〜25%）のレンジ</strong>で中程度の集中度を確保<br>
+      ② <strong>Ladder戦略</strong>（3段階分散）でILの平均化<br>
+      ③ <strong>週次でCollect</strong>して複利再投資（Baseなら$1未満）<br>
+      ④ レンジアウト後は<strong>即再設定せず1〜2日様子見</strong>してから新レンジ設定<br>
+      ⑤ 月次で<strong>Aerodrome/Velodrome</strong>へのステーキング収益も検討
+    </div>
+  </div>
+
+  <div class="alert alert-warning">
+    ⚠️ <strong>注意：</strong> ETH価格が大きく動く（±30%超）局面ではILが手数料収入を上回る可能性があります。相場急変時はポジション一時撤退も選択肢です。本ツールの数値は推定値であり、実際の運用成績を保証するものではありません。
+  </div>
+
+  <div style="height:40px;"></div>
+</div>
+
+<script>
+// ===== IL CALCULATION =====
+function calcIL(priceRatio) {
+  // Standard IL formula: 2*sqrt(r)/(1+r) - 1
+  const r = priceRatio;
+  return 2 * Math.sqrt(r) / (1 + r) - 1;
+}
+
+function calcILConcentrated(currentPrice, rangeLow, rangeHigh, newPrice) {
+  // Uniswap v3 concentrated liquidity IL
+  // More complex formula accounting for range
+  if (newPrice < rangeLow) {
+    // Fully out of range (all in ETH)
+    const pa = rangeLow, pb = rangeHigh, p0 = currentPrice;
+    const sqrtP0 = Math.sqrt(p0), sqrtPa = Math.sqrt(pa), sqrtPb = Math.sqrt(pb);
+    const x0 = 1 / (sqrtP0 - sqrtPa);
+    const y0 = sqrtP0 * sqrtPb - sqrtP0 * sqrtP0; // approx
+    // Simplified: calculate as HODL vs LP
+    const hodlValue = currentPrice; // 1 ETH initial
+    const lpValue = newPrice; // all converted to ETH, now worth newPrice
+    return (lpValue - hodlValue) / hodlValue;
+  } else if (newPrice > rangeHigh) {
+    // Fully out of range (all in USDC)
+    const hodlValue = currentPrice;
+    const lpValue = rangeHigh; // all converted to USDC at upper bound
+    return (lpValue - hodlValue) / hodlValue;
+  } else {
+    // In range - standard IL
+    return calcIL(newPrice / currentPrice);
+  }
+}
+
+function calcConcentrationMultiplier(currentPrice, rangeLow, rangeHigh) {
+  // Capital efficiency multiplier for concentrated liquidity
+  const sqrtP = Math.sqrt(currentPrice);
+  const sqrtPa = Math.sqrt(rangeLow);
+  const sqrtPb = Math.sqrt(rangeHigh);
+  const fullRangeL = 1; // normalized
+  const concentratedL = sqrtP * sqrtPb / (sqrtPb - sqrtP) / currentPrice;
+  // Simplified multiplier
+  const fullWidth = 100; // full range 0 to infinity approximation
+  const ourWidth = (rangeHigh - rangeLow) / currentPrice * 100;
+  return Math.max(1, Math.sqrt(fullWidth / ourWidth) * 1.5);
+}
+
+// ===== MAIN CALCULATION =====
+function calculate() {
+  const currentPrice = parseFloat(document.getElementById('currentPrice').value);
+  const capital = parseFloat(document.getElementById('capital').value);
+  const days = parseInt(document.getElementById('days').value);
+  const dailyVolume = parseFloat(document.getElementById('dailyVolume').value);
+  const poolTVL = parseFloat(document.getElementById('poolTVL').value);
+  const rangeLow = parseFloat(document.getElementById('rangeLow').value);
+  const rangeHigh = parseFloat(document.getElementById('rangeHigh').value);
+  const volatility = parseFloat(document.getElementById('volatility').value) / 100;
+  const rebalanceCount = parseInt(document.getElementById('rebalanceCount').value);
+  const priceChange = parseFloat(document.getElementById('priceSlider').value) / 100;
+  const newPrice = currentPrice * (1 + priceChange);
+
+  // Fee rate (0.05% pool)
+  const feeRate = 0.0005;
+
+  // Capital efficiency multiplier
+  const concMult = calcConcentrationMultiplier(currentPrice, rangeLow, rangeHigh);
+
+  // Our share of liquidity in-range
+  const ourShare = (capital * concMult) / (poolTVL + capital * concMult);
+
+  // Daily fees (only while in range)
+  const isInRange = newPrice >= rangeLow && newPrice <= rangeHigh;
+  const inRangeFraction = isInRange ? 1.0 : 0.0;
+
+  // Estimate in-range time from volatility
+  const dailyVol = volatility / Math.sqrt(365);
+  const zLow = Math.log(rangeLow / currentPrice) / (dailyVol * Math.sqrt(days));
+  const zHigh = Math.log(rangeHigh / currentPrice) / (dailyVol * Math.sqrt(days));
+  const inRangeProbability = Math.min(0.99, Math.max(0.01, normalCDF(zHigh) - normalCDF(zLow)));
+
+  const totalFees = dailyVolume * feeRate * ourShare * concMult * days * inRangeProbability;
+
+  // IL calculation
+  const ilPercent = Math.abs(calcIL(newPrice / currentPrice));
+  const ilAmount = capital * ilPercent * (priceChange !== 0 ? 1 : 0);
+
+  // Gas costs (Base chain - very cheap)
+  const gasPerRebalance = 2.32; // USD
+  const gasDeposit = 0.80;
+  const totalGas = gasDeposit + (rebalanceCount * gasPerRebalance);
+
+  // Net PnL
+  const netPnl = totalFees - ilAmount - totalGas;
+  const netPnlPct = (netPnl / capital) * 100;
+  const annualizedAPR = (totalFees / capital) * (365 / days) * 100;
+
+  // VS HODL
+  const hodlValue = capital * (1 + priceChange);
+  const lpValue = capital + netPnl;
+  const vsHodl = lpValue - hodlValue;
+
+  // Update UI
+  document.getElementById('feeIncome').textContent = `$${totalFees.toFixed(0)}`;
+  document.getElementById('feeIncome').className = 'stat-value positive';
+  document.getElementById('feeAPR').textContent = `APR: ${annualizedAPR.toFixed(1)}%`;
+
+  document.getElementById('ilAmount').textContent = priceChange !== 0 ? `-$${ilAmount.toFixed(0)}` : '$0';
+  document.getElementById('ilPercent').textContent = `IL: ${(ilPercent * 100).toFixed(2)}%`;
+
+  document.getElementById('gasCost').textContent = `-$${totalGas.toFixed(2)}`;
+  document.getElementById('gasBreakdown').textContent = `入金+リバランス×${rebalanceCount}回`;
+
+  const netEl = document.getElementById('netPnl');
+  netEl.textContent = `${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(0)}`;
+  netEl.className = 'stat-value ' + (netPnl >= 0 ? 'positive' : 'negative');
+  document.getElementById('netPnlPct').textContent = `${netPnlPct >= 0 ? '+' : ''}${netPnlPct.toFixed(2)}%`;
+
+  // PnL breakdown
+  document.getElementById('pnlFee').textContent = `+$${totalFees.toFixed(2)}`;
+  document.getElementById('pnlIL').textContent = `-$${ilAmount.toFixed(2)}`;
+  document.getElementById('pnlGas').textContent = `-$${totalGas.toFixed(2)}`;
+  document.getElementById('pnlVsHodl').textContent = `${vsHodl >= 0 ? '+' : ''}$${vsHodl.toFixed(2)}`;
+  const totalEl = document.getElementById('pnlTotal');
+  totalEl.textContent = `${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)}`;
+  totalEl.className = 'mono ' + (netPnl >= 0 ? 'positive' : 'negative');
+
+  // Breakeven
+  const daysToBreakeven = totalGas / (totalFees / days);
+  document.getElementById('breakevenInfo').innerHTML = `
+    <div style="display:grid; gap:6px;">
+      <div>📅 <strong>ガスコスト回収まで：</strong> <span style="color:var(--blue)">${daysToBreakeven.toFixed(1)}日</span></div>
+      <div>📊 <strong>在圏確率（${days}日間）：</strong> <span style="color:var(--purple)">${(inRangeProbability * 100).toFixed(1)}%</span></div>
+      <div>⚡ <strong>集中度倍率：</strong> <span style="color:var(--orange)">${concMult.toFixed(1)}x</span>（全幅比）</div>
+      <div>🏦 <strong>プール内シェア（有効）：</strong> <span style="color:var(--green)">${(ourShare * concMult * 100).toFixed(4)}%</span></div>
+    </div>
+  `;
+
+  // Optimal range (1 sigma)
+  const periodVol = volatility * Math.sqrt(days / 365);
+  const optLow = currentPrice * Math.exp(-periodVol);
+  const optHigh = currentPrice * Math.exp(periodVol);
+  const optProb = normalCDF(1) - normalCDF(-1); // ~68%
+
+  document.getElementById('optLow').textContent = `$${optLow.toFixed(0)}`;
+  document.getElementById('optHigh').textContent = `$${optHigh.toFixed(0)}`;
+  document.getElementById('inRangeProb').textContent = `${(optProb * 100).toFixed(0)}%`;
+
+  // Draw chart
+  drawILChart(currentPrice, rangeLow, rangeHigh, newPrice);
+}
+
+function drawILChart(currentPrice, rangeLow, rangeHigh, newPrice) {
+  const canvas = document.getElementById('ilChart');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+  canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const minPrice = currentPrice * 0.3;
+  const maxPrice = currentPrice * 2.2;
+  const points = 200;
+
+  const prices = [];
+  const ils = [];
+
+  for (let i = 0; i <= points; i++) {
+    const p = minPrice + (maxPrice - minPrice) * i / points;
+    prices.push(p);
+    ils.push(calcIL(p / currentPrice) * 100);
+  }
+
+  const minIL = Math.min(...ils);
+  const maxIL = 0;
+
+  const toX = p => (p - minPrice) / (maxPrice - minPrice) * W;
+  const toY = il => (1 - (il - minIL) / (maxIL - minIL + 0.001)) * (H - 20) + 10;
+
+  // Background
+  ctx.fillStyle = '#1c2128';
+  ctx.fillRect(0, 0, W, H);
+
+  // Range zone highlight
+  const rxLow = toX(rangeLow);
+  const rxHigh = toX(rangeHigh);
+  ctx.fillStyle = 'rgba(88, 166, 255, 0.08)';
+  ctx.fillRect(rxLow, 0, rxHigh - rxLow, H);
+
+  // Draw IL curve
+  ctx.beginPath();
+  for (let i = 0; i <= points; i++) {
+    const x = toX(prices[i]);
+    const y = toY(ils[i]);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = '#f85149';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // In-range segment (blue)
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i <= points; i++) {
+    if (prices[i] >= rangeLow && prices[i] <= rangeHigh) {
+      const x = toX(prices[i]);
+      const y = toY(ils[i]);
+      if (!started) { ctx.moveTo(x, y); started = true; }
+      else ctx.lineTo(x, y);
+    }
+  }
+  ctx.strokeStyle = '#3fb950';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Current price line
+  const cpx = toX(currentPrice);
+  ctx.beginPath();
+  ctx.moveTo(cpx, 0);
+  ctx.lineTo(cpx, H);
+  ctx.strokeStyle = 'rgba(210, 153, 34, 0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // New price line (if changed)
+  if (Math.abs(newPrice - currentPrice) > 10) {
+    const npx = toX(newPrice);
+    ctx.beginPath();
+    ctx.moveTo(npx, 0);
+    ctx.lineTo(npx, H);
+    ctx.strokeStyle = 'rgba(247, 120, 186, 0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Range lines
+  ctx.beginPath();
+  ctx.moveTo(rxLow, 0);
+  ctx.lineTo(rxLow, H);
+  ctx.strokeStyle = 'rgba(88, 166, 255, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(rxHigh, 0);
+  ctx.lineTo(rxHigh, H);
+  ctx.strokeStyle = 'rgba(88, 166, 255, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Labels
+  ctx.font = '10px JetBrains Mono, monospace';
+  ctx.fillStyle = '#d29922';
+  ctx.fillText(`$${currentPrice.toFixed(0)}`, cpx + 3, 16);
+
+  ctx.fillStyle = '#58a6ff';
+  ctx.fillText(`$${rangeLow.toFixed(0)}`, rxLow + 2, H - 4);
+  ctx.fillText(`$${rangeHigh.toFixed(0)}`, Math.max(rxHigh - 50, 0), H - 4);
+
+  // IL labels on Y axis
+  ctx.fillStyle = '#8b949e';
+  ctx.fillText('0%', 3, 16);
+  ctx.fillText(`${minIL.toFixed(1)}%`, 3, H - 6);
+}
+
+// Normal CDF approximation
+function normalCDF(z) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp(-z * z / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  return z > 0 ? 1 - p : p;
+}
+
+// ===== SLIDER =====
+document.getElementById('priceSlider').addEventListener('input', function() {
+  const val = parseInt(this.value);
+  const display = document.getElementById('priceSliderVal');
+  display.textContent = (val >= 0 ? '+' : '') + val + '%';
+  display.style.color = val > 0 ? 'var(--green)' : val < 0 ? 'var(--red)' : 'var(--blue)';
+});
+
+// ===== STRATEGY SELECTION =====
+function selectStrategy(type) {
+  ['conservative', 'balanced', 'aggressive'].forEach(s => {
+    document.getElementById('strat-' + s).classList.remove('active');
+  });
+  document.getElementById('strat-' + type).classList.add('active');
+
+  const currentPrice = parseFloat(document.getElementById('currentPrice').value) || 3800;
+  if (type === 'conservative') {
+    document.getElementById('rangeLow').value = Math.round(currentPrice * 0.55);
+    document.getElementById('rangeHigh').value = Math.round(currentPrice * 1.55);
+  } else if (type === 'balanced') {
+    document.getElementById('rangeLow').value = Math.round(currentPrice * 0.78);
+    document.getElementById('rangeHigh').value = Math.round(currentPrice * 1.26);
+  } else {
+    document.getElementById('rangeLow').value = Math.round(currentPrice * 0.92);
+    document.getElementById('rangeHigh').value = Math.round(currentPrice * 1.10);
+  }
+  calculate();
+}
+
+// ===== INIT =====
+window.addEventListener('resize', () => {
+  const cp = parseFloat(document.getElementById('currentPrice').value) || 3800;
+  const rl = parseFloat(document.getElementById('rangeLow').value) || 3200;
+  const rh = parseFloat(document.getElementById('rangeHigh').value) || 4500;
+  const pc = parseFloat(document.getElementById('priceSlider').value) / 100;
+  drawILChart(cp, rl, rh, cp * (1 + pc));
+});
+
+calculate();
+</script>
+</body>
+</html>
