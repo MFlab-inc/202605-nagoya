@@ -1,0 +1,9 @@
+ccxt==4.4.44
+pandas==2.2.3
+pandas-ta==0.3.14b0
+plotly==5.24.1
+notebook==7.2.2
+ipykernel==6.29.5
+numpy==1.26.4
+yfinance>=0.2.40
+fredapi>=0.5.1
