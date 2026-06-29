@@ -1,7 +1,61 @@
-# FX デイトレ用 朝レート配信 — FRED 取得モジュール
+# FX デイトレ用 レート配信モジュール
 
-FXデイトレ用「朝レート配信」自動化の **データソース層（ステージ1: JST 10:30 配信）** のうち、
-FRED API から **前日確定データ** を取得して Google Sheets に追記（upsert）する部分です。
+FXデイトレ用「レート配信」自動化のデータ取得部分です。2つのスクリプトがあります。
+
+| ファイル | 配信 | 内容 |
+|----------|------|------|
+| `fred_fetcher.py` | ステージ1（朝 JST 10:30） | FRED から **前日確定** の金利・マクロ系列を取得 |
+| `fx_fetcher.py`   | ステージ2（夕方 JST 16:10〜16:30） | FX レート＋CME通貨先物(6E/6B/6A/6J)の値・高安・出来高・建玉を取得 |
+
+どちらも Google Sheets に追記（`(キー, observation_date)` で上書き）し、`data_status` を付けます。
+
+> ⚠️ 注意: 開発環境では外部サイトへの通信がブロックされているため、**実データ取得はあなたのPC/サーバー（cron）で実行**してください。計算ロジックはオフラインのテストで検証済みです。
+
+---
+
+## ステージ2: 夕方配信（`fx_fetcher.py`）
+
+データ元は **Yahoo Finance（無料・登録不要）** です。
+
+### 取得する銘柄
+
+- FX: USDJPY, EURUSD, GBPUSD, AUDUSD, EURJPY, GBPJPY, AUDJPY, DXY(ドル指数)
+- CME 通貨先物: 6E(ユーロ), 6B(ポンド), 6A(豪ドル), 6J(円) … 値・本日高安・出来高・建玉(OI)
+
+### data_status の意味
+
+| 値 | 意味 |
+|----|------|
+| `ok` | 新しいFXレート |
+| `preliminary` | 先物のまだ確定していない（速報）出来高・建玉 |
+| `final` | 確定済みセッションの出来高・建玉 |
+| `stale` | 最新データが古い（更新が止まっている） |
+| `error` | 取得失敗・データなし |
+
+### まだ入っていないもの（要相談）
+
+夕方配信で指定された **Saxo FX Options Analytics（0700 GMT）** と **Pin Risk** は、
+Saxo のアカウント/データアクセスが必要な別ソースのため、このモジュールには含めていません。
+本モジュールはその土台となる「価格・出来高・建玉」を提供します。Saxo データの入手方法が決まれば追加します。
+
+### 使い方
+
+```bash
+pip install -r requirements.txt
+python fx_fetcher.py          # テスト（通信不要）
+python fx_fetcher.py --run    # 本番取得 + Sheets へ upsert
+```
+
+cron で JST 16:10 に `python fx_fetcher.py --run` を実行する想定です。
+
+環境変数: `GOOGLE_SHEETS_ID`(必須), `GOOGLE_SHEETS_WORKSHEET_FX`(既定 `fx_evening`),
+`GOOGLE_SERVICE_ACCOUNT_JSON` か `GOOGLE_APPLICATION_CREDENTIALS`(認証), `FX_STALE_AFTER_HOURS`(既定 12)。
+
+---
+
+## ステージ1: 朝配信（`fred_fetcher.py`）
+
+FRED API から **前日確定データ** を取得して Google Sheets に追記（upsert）します。
 
 当日現在値は使いません。FRED は確定済み観測値のみを返すため、要件「前日確定データのみ使用」と一致します。
 

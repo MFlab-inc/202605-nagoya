@@ -1,3 +1,4 @@
 requests>=2.31
 gspread>=6.0
 google-auth>=2.27
+yfinance>=0.2.40
