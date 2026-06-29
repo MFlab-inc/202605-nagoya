@@ -112,29 +112,19 @@
 
 ---
 
-## ⑦ 合鍵やIDをプログラムに教える（環境変数）
+## ⑦ 合鍵やIDをプログラムに教える（設定ファイル `.env`）
 
-プログラムは「合鍵の場所」や「シートのID」を**環境変数**という形で受け取ります。
-ターミナルで、その都度この3行（朝用は4行）を貼り付けます。
+毎回コマンドを打つ代わりに、**設定ファイルに1回書くだけ**でOKにしてあります。
 
-**Mac / Linux の場合：**
-```bash
-# 共通
-export GOOGLE_SHEETS_ID="①で控えたスプレッドシートID"
-export GOOGLE_APPLICATION_CREDENTIALS="③のJSONファイルの場所/service-account.json"
+1. `fx_morning_rates` フォルダの中の **`.env.example`** をコピーする
+2. コピーしたファイルの名前を **`.env`**（ドットから始まる）に変える
+3. テキストエディタで開き、`=` の右側を自分の値に直す：
+   - `GOOGLE_SHEETS_ID` … ①のスプレッドシートID（最初から入っています）
+   - `GOOGLE_APPLICATION_CREDENTIALS` … ③で保存した合鍵JSONの**フルパス**
+   - `FRED_API_KEY` … ⑤のキー（夕方のFXだけ使うなら空のままでOK）
+4. 保存する
 
-# 朝用(金利)を使うときだけ
-export FRED_API_KEY="⑤で控えたAPIキー"
-```
-
-**Windows（コマンドプロンプト）の場合：**
-```cmd
-set GOOGLE_SHEETS_ID=①で控えたスプレッドシートID
-set GOOGLE_APPLICATION_CREDENTIALS=③のJSONファイルの場所\service-account.json
-set FRED_API_KEY=⑤で控えたAPIキー
-```
-
-> 毎回貼るのが面倒なら、後述の「⑨ 自動実行」でまとめて設定できます。
+> ⚠️ `.env` と 合鍵JSON は**秘密の情報**です。`.gitignore` で置き場(GitHub)に上がらないようにしてあります。他人に渡さないでください。
 
 ---
 
@@ -146,7 +136,14 @@ python3 fx_fetcher.py        # → All fx_fetcher tests passed. と出ればOK
 python3 fred_fetcher.py      # → All fred_fetcher tests passed. と出ればOK
 ```
 
-次に**本番**。ネットにつないで実際にシートへ書き込みます：
+次に**本番**。ネットにつないで実際にシートへ書き込みます。
+**いちばん簡単なのは、フォルダの中のランチャーをダブルクリック**する方法です：
+
+- Mac … `run_evening.command`（夕方FX）／ `run_morning.command`（朝・金利）
+  - 初回だけ「開けません」と出たら、右クリック →「開く」で許可してください
+- Windows … `run_evening.bat`（夕方FX）／ `run_morning.bat`（朝・金利）
+
+コマンドで動かしたい人は、こちらでも同じです：
 ```bash
 python3 fx_fetcher.py --run     # 夕方用(FX)：fx_evening タブに書き込み
 python3 fred_fetcher.py --run   # 朝用(金利)：fred_daily タブに書き込み

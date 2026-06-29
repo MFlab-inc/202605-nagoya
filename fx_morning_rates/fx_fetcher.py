@@ -381,6 +381,11 @@ class SheetsWriter:
 
 def run() -> List[FxRecord]:
     """Live entry point: fetch all instruments and upsert into Google Sheets."""
+    try:
+        from envload import load_default_env
+        load_default_env()
+    except Exception:  # noqa: BLE001 - .env is optional
+        pass
     records = fetch_all()
     counts: Dict[str, int] = {}
     for r in records:

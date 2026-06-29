@@ -329,6 +329,11 @@ class SheetsWriter:
 
 def run() -> List[RateRecord]:
     """Live entry point: fetch all series and upsert into Google Sheets."""
+    try:
+        from envload import load_default_env
+        load_default_env()
+    except Exception:  # noqa: BLE001 - .env is optional
+        pass
     records = fetch_all()
     ok = sum(1 for r in records if r.data_status == STATUS_OK)
     err = [r for r in records if r.data_status == STATUS_ERROR]
