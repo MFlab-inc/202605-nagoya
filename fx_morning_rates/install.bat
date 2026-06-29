@@ -1,7 +1,8 @@
 @echo off
-REM 必要な部品(ライブラリ)をインストールする Windows 用ランチャー。最初に1回だけ実行します。
+chcp 65001 >nul
 cd /d "%~dp0"
+echo Installing required libraries...
 python -m pip install -r requirements.txt
 echo.
-echo ----- 終わりました。何かキーを押すと閉じます -----
+echo ----- Done. Press any key to close. -----
 pause
