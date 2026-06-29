@@ -54,24 +54,27 @@ class Instrument:
     name: str            # human description
     yahoo: str           # Yahoo Finance ticker
     kind: str            # "fx" or "future"
+    decimals: int = 5    # how many decimal places to show for prices
 
 
 # Spot FX pairs + the four CME currency futures the evening distribution needs.
+# `decimals` is the display precision: JPY pairs/index ~3, USD pairs ~5,
+# the yen future ~7 (it trades around 0.0062).
 INSTRUMENTS: List[Instrument] = [
     # --- spot FX -----------------------------------------------------------
-    Instrument("USDJPY", "US Dollar / Japanese Yen", "JPY=X", "fx"),
-    Instrument("EURUSD", "Euro / US Dollar", "EURUSD=X", "fx"),
-    Instrument("GBPUSD", "British Pound / US Dollar", "GBPUSD=X", "fx"),
-    Instrument("AUDUSD", "Australian Dollar / US Dollar", "AUDUSD=X", "fx"),
-    Instrument("EURJPY", "Euro / Japanese Yen", "EURJPY=X", "fx"),
-    Instrument("GBPJPY", "British Pound / Japanese Yen", "GBPJPY=X", "fx"),
-    Instrument("AUDJPY", "Australian Dollar / Japanese Yen", "AUDJPY=X", "fx"),
-    Instrument("DXY", "US Dollar Index", "DX-Y.NYB", "fx"),
+    Instrument("USDJPY", "US Dollar / Japanese Yen", "JPY=X", "fx", 3),
+    Instrument("EURUSD", "Euro / US Dollar", "EURUSD=X", "fx", 5),
+    Instrument("GBPUSD", "British Pound / US Dollar", "GBPUSD=X", "fx", 5),
+    Instrument("AUDUSD", "Australian Dollar / US Dollar", "AUDUSD=X", "fx", 5),
+    Instrument("EURJPY", "Euro / Japanese Yen", "EURJPY=X", "fx", 3),
+    Instrument("GBPJPY", "British Pound / Japanese Yen", "GBPJPY=X", "fx", 3),
+    Instrument("AUDJPY", "Australian Dollar / Japanese Yen", "AUDJPY=X", "fx", 3),
+    Instrument("DXY", "US Dollar Index", "DX-Y.NYB", "fx", 3),
     # --- CME currency futures (front month) --------------------------------
-    Instrument("6E", "CME Euro FX future", "6E=F", "future"),
-    Instrument("6B", "CME British Pound future", "6B=F", "future"),
-    Instrument("6A", "CME Australian Dollar future", "6A=F", "future"),
-    Instrument("6J", "CME Japanese Yen future", "6J=F", "future"),
+    Instrument("6E", "CME Euro FX future", "6E=F", "future", 5),
+    Instrument("6B", "CME British Pound future", "6B=F", "future", 5),
+    Instrument("6A", "CME Australian Dollar future", "6A=F", "future", 5),
+    Instrument("6J", "CME Japanese Yen future", "6J=F", "future", 7),
 ]
 
 COLUMNS: Sequence[str] = (
@@ -90,6 +93,30 @@ COLUMNS: Sequence[str] = (
     "fetched_at_utc",
     "data_status",
 )
+
+# Japanese column titles written as the sheet's header row (same order as
+# COLUMNS). The internal field names above stay English; only the display
+# header changes. Edit here to relabel columns.
+HEADERS_JA: Sequence[str] = (
+    "銘柄",
+    "名称",
+    "日付",
+    "現在値",
+    "本日高値",
+    "本日安値",
+    "前日終値",
+    "前日比",
+    "変化率(%)",
+    "出来高",
+    "建玉",
+    "取得元",
+    "取得時刻(UTC)",
+    "状態",
+)
+
+# First-cell values that mark a header row (so upsert can recognise and
+# replace an old header, even one written in a previous language).
+_HEADER_FIRST_CELLS = {COLUMNS[0], HEADERS_JA[0]}
 
 # data_status values
 STATUS_OK = "ok"
@@ -219,14 +246,20 @@ def build_record(inst: Instrument,
     latest = usable[-1]
     prev = usable[-2] if len(usable) > 1 else None
 
+    dp = inst.decimals
+    last = _as_float(latest.get("close"))
+    prev_close = _as_float(prev.get("close")) if prev else None
+    change_abs, change_pct = compute_changes(last, prev_close)
+
     rec.observation_date = str(latest.get("date", ""))
-    rec.last = _as_float(latest.get("close"))
-    rec.day_high = _as_float(latest.get("high"))
-    rec.day_low = _as_float(latest.get("low"))
-    rec.volume = _as_float(latest.get("volume"))
-    rec.previous_close = _as_float(prev.get("close")) if prev else None
-    rec.open_interest = _as_float(open_interest)
-    rec.change_abs, rec.change_pct = compute_changes(rec.last, rec.previous_close)
+    rec.last = _round(last, dp)
+    rec.day_high = _round(_as_float(latest.get("high")), dp)
+    rec.day_low = _round(_as_float(latest.get("low")), dp)
+    rec.previous_close = _round(prev_close, dp)
+    rec.change_abs = _round(change_abs, dp)
+    rec.change_pct = _round(change_pct, 3)
+    rec.volume = _as_int(latest.get("volume"))
+    rec.open_interest = _as_int(open_interest)
 
     obs_age = _obs_age_hours(rec.observation_date, now_jst)
     rec.data_status = decide_status(
@@ -249,6 +282,17 @@ def _as_float(v) -> Optional[float]:
         return None
     # treat NaN as missing
     return None if f != f else f
+
+
+def _round(v: Optional[float], decimals: int) -> Optional[float]:
+    """None-safe round for display precision."""
+    return None if v is None else round(v, decimals)
+
+
+def _as_int(v) -> Optional[int]:
+    """Volume / open interest read nicest as whole numbers."""
+    f = _as_float(v)
+    return None if f is None else int(round(f))
 
 
 def _obs_age_hours(obs_date: str, now_jst: datetime) -> Optional[float]:
@@ -312,14 +356,19 @@ def fetch_all(instruments: Optional[List[Instrument]] = None) -> List[FxRecord]:
 
 def upsert_rows(existing: List[List[str]],
                 records: Sequence[FxRecord]) -> List[List[str]]:
-    """Pure upsert: overwrite on (symbol, observation_date), else append."""
-    header = list(COLUMNS)
+    """Pure upsert: overwrite on (symbol, observation_date), else append.
+
+    The output header row is the Japanese HEADERS_JA. An existing header row
+    (in either language) is detected by its first cell and dropped, so a sheet
+    written with the old English header upgrades cleanly on the next run.
+    """
+    header = list(HEADERS_JA)
     sym_i = COLUMNS.index("symbol")
     date_i = COLUMNS.index("observation_date")
-    if existing and existing[0] == header:
+    if existing and existing[0] and existing[0][0] in _HEADER_FIRST_CELLS:
         body = existing[1:]
     else:
-        body = [r for r in existing if r and r[0] != COLUMNS[0]]
+        body = [r for r in existing if r and r[0] not in _HEADER_FIRST_CELLS]
 
     index: Dict[tuple, int] = {}
     for i, row in enumerate(body):
@@ -430,30 +479,31 @@ def run_tests() -> None:
     assert settled_through(morning) == "2026-06-27"
     assert settled_through(evening) == "2026-06-28"
 
-    # 4. build_record happy path (spot FX) ---------------------------------
-    fx = Instrument("USDJPY", "USD/JPY", "JPY=X", "fx")
+    # 4. build_record happy path (spot FX) + rounding to 3 dp --------------
+    fx = Instrument("USDJPY", "USD/JPY", "JPY=X", "fx", 3)
     bars = [
-        {"date": "2026-06-26", "high": 157.2, "low": 156.4, "close": 157.0, "volume": 0},
-        {"date": "2026-06-29", "high": 158.1, "low": 157.0, "close": 157.8, "volume": 0},
+        {"date": "2026-06-26", "high": 157.2, "low": 156.4, "close": 157.04321, "volume": 0},
+        {"date": "2026-06-29", "high": 158.16789, "low": 157.0, "close": 157.84567, "volume": 0},
     ]
     rec = build_record(fx, bars, None, now_utc, now_jst, 48, "2026-06-27")
     assert rec.data_status == STATUS_OK
-    assert rec.last == 157.8 and rec.previous_close == 157.0
-    assert rec.day_high == 158.1 and rec.day_low == 157.0
-    assert rec.change_abs == 0.8
+    assert rec.last == 157.846 and rec.previous_close == 157.043   # rounded to 3
+    assert rec.day_high == 158.168 and rec.day_low == 157.0
+    assert rec.change_abs == 0.802                                  # 157.84567-157.04321
+    assert isinstance(rec.change_pct, float)
     assert rec.fetched_at_utc.endswith("Z")
-    assert len(rec.to_row()) == len(COLUMNS)
+    assert len(rec.to_row()) == len(COLUMNS) == len(HEADERS_JA)
 
-    # 5. build_record for a future -> preliminary + OI ---------------------
-    fut = Instrument("6J", "JPY future", "6J=F", "future")
+    # 5. build_record for a future -> preliminary, int vol/OI, 7 dp --------
+    fut = Instrument("6J", "JPY future", "6J=F", "future", 7)
     fbars = [
-        {"date": "2026-06-26", "high": 0.00640, "low": 0.00631, "close": 0.00637, "volume": 120000},
-        {"date": "2026-06-29", "high": 0.00642, "low": 0.00636, "close": 0.00639, "volume": 95000},
+        {"date": "2026-06-26", "high": 0.00640, "low": 0.00631, "close": 0.00637, "volume": 120000.0},
+        {"date": "2026-06-29", "high": 0.00642, "low": 0.00636, "close": 0.00639, "volume": 95000.0},
     ]
-    frec = build_record(fut, fbars, 250000, now_utc, now_jst, 48, "2026-06-27")
+    frec = build_record(fut, fbars, 250000.0, now_utc, now_jst, 48, "2026-06-27")
     assert frec.data_status == STATUS_PRELIMINARY  # 06-29 > settled 06-27
-    assert frec.open_interest == 250000.0
-    assert frec.volume == 95000.0
+    assert frec.open_interest == 250000 and isinstance(frec.open_interest, int)
+    assert frec.volume == 95000 and isinstance(frec.volume, int)
 
     # 6. NaN / missing handling --------------------------------------------
     nan = float("nan")
@@ -466,8 +516,9 @@ def run_tests() -> None:
     assert build_record(fx, [], None, now_utc, now_jst, 48,
                         "2026-06-27").data_status == STATUS_ERROR
 
-    # 8. upsert: append then overwrite on (symbol, observation_date) --------
-    grid = upsert_rows([list(COLUMNS)], [rec])
+    # 8. upsert: writes JP header, append, then overwrite ------------------
+    grid = upsert_rows([list(COLUMNS)], [rec])      # old English header in
+    assert grid[0] == list(HEADERS_JA), "header must upgrade to Japanese"
     assert len(grid) == 2 and grid[1][0] == "USDJPY"
     rec2 = build_record(fx, [
         {"date": "2026-06-26", "high": 157.2, "low": 156.4, "close": 157.0, "volume": 0},
@@ -476,6 +527,10 @@ def run_tests() -> None:
     grid = upsert_rows(grid, [rec2])
     assert len(grid) == 2, "same (symbol, date) must overwrite"
     assert grid[1][3] == repr(158.3)
+
+    # 9. an old Japanese header is also recognised (no duplicate row) -------
+    grid = upsert_rows([list(HEADERS_JA)] + grid[1:], [rec2])
+    assert grid[0] == list(HEADERS_JA) and len(grid) == 2
 
     print("All fx_fetcher tests passed.")
 
